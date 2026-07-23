@@ -3,11 +3,17 @@ const DB_ACCOUNTS = 'pos_accounts';
 const DB_PRODUCTS = 'pos_products';
 const DB_HISTORY = 'pos_history';
 const DB_THEME = 'pos_theme';
+const DB_SETTINGS = 'pos_settings';
 
 // State Management
 let accounts = JSON.parse(localStorage.getItem(DB_ACCOUNTS)) || [];
 let products = JSON.parse(localStorage.getItem(DB_PRODUCTS)) || [];
 let history = JSON.parse(localStorage.getItem(DB_HISTORY)) || [];
+let settings = JSON.parse(localStorage.getItem(DB_SETTINGS)) || {
+  sound: 'enabled',
+  cooldown: 600,
+  fps: 30
+};
 
 let activeAccount = null;
 let cart = [];
@@ -24,6 +30,8 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 function playSound(type) {
+  if (settings.sound === 'disabled') return;
+
   try {
     if (!audioCtx) audioCtx = new AudioContext();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -69,6 +77,7 @@ function playSound(type) {
 // App Initialization
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  initSettingsUI();
   createNotificationContainer();
   renderAccountsTable();
   renderInventoryGrid();
@@ -77,24 +86,51 @@ document.addEventListener('DOMContentLoaded', () => {
   initInstantScanner();
 });
 
-// UI Theme
+// UI Theme & Settings
 function initTheme() {
   const savedTheme = localStorage.getItem(DB_THEME) || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  updateThemeButton(savedTheme);
+  applyTheme(savedTheme);
 }
 
-function toggleTheme() {
+function applyTheme(themeName) {
+  document.documentElement.setAttribute('data-theme', themeName);
+  localStorage.setItem(DB_THEME, themeName);
+  updateThemeButton(themeName);
+}
+
+function quickToggleTheme() {
   const currentTheme = document.documentElement.getAttribute('data-theme');
-  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem(DB_THEME, newTheme);
-  updateThemeButton(newTheme);
+  const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(nextTheme);
 }
 
 function updateThemeButton(theme) {
   const btn = document.getElementById('theme-btn');
   if (btn) btn.innerText = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+}
+
+function initSettingsUI() {
+  const soundSelect = document.getElementById('setting-sound');
+  const cooldownSelect = document.getElementById('setting-scan-cooldown');
+  const fpsSelect = document.getElementById('setting-fps');
+
+  if (soundSelect) soundSelect.value = settings.sound;
+  if (cooldownSelect) cooldownSelect.value = settings.cooldown;
+  if (fpsSelect) fpsSelect.value = settings.fps;
+}
+
+function saveSettings() {
+  settings.sound = document.getElementById('setting-sound').value;
+  settings.cooldown = parseInt(document.getElementById('setting-scan-cooldown').value, 10);
+  settings.fps = parseInt(document.getElementById('setting-fps').value, 10);
+
+  localStorage.setItem(DB_SETTINGS, JSON.stringify(settings));
+  showNotification("Settings updated!", "success");
+
+  // Restart live scanner with high speed settings applied
+  if (instantScannerInstance && instantScannerInstance.isScanning) {
+    instantScannerInstance.stop().then(() => initInstantScanner());
+  }
 }
 
 function createNotificationContainer() {
@@ -119,7 +155,7 @@ function showNotification(message, type = 'error') {
   setTimeout(() => {
     toast.classList.add('hide');
     setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  }, 3000);
 }
 
 function switchTab(tabId) {
@@ -134,7 +170,7 @@ function switchTab(tabId) {
 }
 
 // ----------------------------------------------------
-// ALWAYS-ON LIVE SCANNER DOCK
+// HIGH-SPEED INSTANT SCANNER DOCK
 // ----------------------------------------------------
 
 async function initInstantScanner() {
@@ -146,6 +182,10 @@ async function initInstantScanner() {
     if (devices && devices.length > 0) {
       const selectedCamId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
       
+      if (instantScannerInstance) {
+        try { await instantScannerInstance.stop(); } catch(e) {}
+      }
+
       instantScannerInstance = new Html5Qrcode("instant-reader", {
         useBarCodeDetectorIfSupported: true,
         formatsToSupport: [
@@ -159,7 +199,16 @@ async function initInstantScanner() {
         ]
       });
 
-      const config = { fps: 20, qrbox: { width: 220, height: 100 } };
+      // High Performance FPS Target Constraints
+      const config = {
+        fps: settings.fps || 30,
+        qrbox: { width: 280, height: 120 },
+        videoConstraints: {
+          facingMode: "environment",
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        }
+      };
 
       instantScannerInstance.start(
         selectedCamId,
@@ -171,7 +220,9 @@ async function initInstantScanner() {
           addToCartByBarcode(decodedText);
 
           clearTimeout(scanCooldownTimer);
-          scanCooldownTimer = setTimeout(() => { lastScannedCode = ''; }, 1500);
+          scanCooldownTimer = setTimeout(() => {
+            lastScannedCode = '';
+          }, settings.cooldown || 600);
         },
         () => {}
       ).catch(e => console.warn("Live scanner starting standby:", e));
@@ -192,7 +243,7 @@ function toggleInstantScanner() {
 }
 
 // ----------------------------------------------------
-// LIVE PRODUCT SNAPSHOT WITH AUTOMATIC BACKGROUND REMOVAL
+// PHOTO CAPTURE & AUTO BG REMOVAL
 // ----------------------------------------------------
 
 async function openPhotoCaptureModal() {
@@ -206,7 +257,7 @@ async function openPhotoCaptureModal() {
     });
     video.srcObject = photoStream;
   } catch (err) {
-    console.error("Camera snapshot open error:", err);
+    console.error("Camera snapshot error:", err);
     showNotification("Could not start camera for product picture.", "error");
     closePhotoModal();
   }
@@ -233,11 +284,9 @@ function captureAndRemoveBackground() {
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // AUTOMATIC BACKGROUND CUTOUT FILTER
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
 
-  // Use top-left pixel sampling for ambient background color
   const bgR = data[0];
   const bgG = data[1];
   const bgB = data[2];
@@ -251,7 +300,7 @@ function captureAndRemoveBackground() {
     const colorDist = Math.sqrt(Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2));
 
     if (isLightBackground || colorDist < 65) {
-      data[i + 3] = 0; // Set pixel fully transparent
+      data[i + 3] = 0;
     }
   }
 
@@ -269,7 +318,7 @@ function captureAndRemoveBackground() {
 }
 
 // ----------------------------------------------------
-// BARCODES & OVERLAY SCANNER
+// MODAL SCANNER & BARCODES
 // ----------------------------------------------------
 
 function generateRandomBarcode() {
@@ -279,9 +328,7 @@ function generateRandomBarcode() {
 
 function showBarcodeModal(code, name) {
   const labelHeader = document.getElementById('print-label-header');
-  if (labelHeader) {
-    labelHeader.innerText = code;
-  }
+  if (labelHeader) labelHeader.innerText = code;
   
   JsBarcode("#barcode-canvas", code, {
     format: "CODE128",
@@ -325,7 +372,6 @@ async function openScanner(target = 'cart') {
       showNotification("No cameras detected.", "error");
     }
   } catch (err) {
-    console.error("Camera scan error:", err);
     cameraSelect.innerHTML = '<option value="">Camera error</option>';
     showNotification("Camera access denied or unavailable.", "error");
   }
@@ -346,11 +392,7 @@ function startCameraStream(cameraId) {
       ]
     });
 
-    const config = {
-      fps: 25,
-      qrbox: { width: 280, height: 160 },
-      aspectRatio: 1.777778
-    };
+    const config = { fps: 30, qrbox: { width: 280, height: 160 } };
 
     html5QrcodeScanner.start(
       cameraId,
@@ -361,7 +403,6 @@ function startCameraStream(cameraId) {
       },
       () => {}
     ).catch(err => {
-      console.error("Failed to start stream:", err);
       showNotification("Failed to open camera stream.", "error");
     });
   });
@@ -503,8 +544,8 @@ function renderAccountsTable() {
         <td>${acc.phone}</td>
         <td>$${acc.balance.toFixed(2)}</td>
         <td>
-          <button class="btn btn-warning" onclick="startEditAccount('${acc.accNum}')">Edit</button>
-          <button class="btn btn-danger" onclick="deleteAccount('${acc.accNum}')">Delete</button>
+          <button class="btn btn-warning btn-animated" onclick="startEditAccount('${acc.accNum}')">Edit</button>
+          <button class="btn btn-danger btn-animated" onclick="deleteAccount('${acc.accNum}')">Delete</button>
         </td>
       </tr>
     `;
@@ -665,10 +706,10 @@ function renderInventoryGrid() {
         <p>$${p.price.toFixed(2)} | Stock: ${p.stock}</p>
         <small>Code: ${p.code}</small>
         <div style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem;">
-          <button class="btn btn-primary btn-block" onclick="showBarcodeModal('${p.code}', '${p.name}')">🖨️ Barcode</button>
+          <button class="btn btn-primary btn-animated btn-block" onclick="showBarcodeModal('${p.code}', '${p.name}')">🖨️ Barcode</button>
           <div style="display: flex; gap: 0.25rem;">
-            <button class="btn btn-warning btn-block" onclick="startEditProduct('${p.code}')">Edit</button>
-            <button class="btn btn-danger btn-block" onclick="deleteProduct('${p.code}')">Delete</button>
+            <button class="btn btn-warning btn-animated btn-block" onclick="startEditProduct('${p.code}')">Edit</button>
+            <button class="btn btn-danger btn-animated btn-block" onclick="deleteProduct('${p.code}')">Delete</button>
           </div>
         </div>
       </div>
@@ -786,9 +827,9 @@ function renderCart() {
           <small>$${item.price.toFixed(2)} x ${item.qty} = $${itemTotal.toFixed(2)}</small>
         </div>
         <div class="cart-controls">
-          <button class="btn btn-warning btn-qty" onclick="updateCartQty('${item.code}', -1)">-</button>
+          <button class="btn btn-warning btn-animated btn-qty" onclick="updateCartQty('${item.code}', -1)">-</button>
           <span>${item.qty}</span>
-          <button class="btn btn-success btn-qty" onclick="updateCartQty('${item.code}', 1)">+</button>
+          <button class="btn btn-success btn-animated btn-qty" onclick="updateCartQty('${item.code}', 1)">+</button>
           <button class="btn-remove-item" onclick="removeFromCart('${item.code}')">&times;</button>
         </div>
       </li>
@@ -888,7 +929,7 @@ function renderHistoryTable() {
         <td>${subtotalText}</td>
         <td><small>${adjustmentsText}</small></td>
         <td><strong>$${h.total.toFixed(2)}</strong></td>
-        <td><button class="btn btn-danger" onclick="deleteHistoryEntry(${index})">Delete</button></td>
+        <td><button class="btn btn-danger btn-animated" onclick="deleteHistoryEntry(${index})">Delete</button></td>
       </tr>
     `;
   });

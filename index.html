@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sleek Offline POS</title>
+  <title>Sleek Modern POS</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -11,15 +11,16 @@
 <body>
 
   <nav class="navbar">
-    <div class="logo">⚡ SleekPOS</div>
+    <div class="logo">⚡ SleekPOS <span class="badge-tag">PRO</span></div>
     <div class="nav-right">
       <div class="nav-links">
         <button class="nav-btn active" onclick="switchTab('dashboard-tab')">Dashboard</button>
         <button class="nav-btn" onclick="switchTab('customers-tab')">Customers</button>
         <button class="nav-btn" onclick="switchTab('inventory-tab')">Inventory</button>
         <button class="nav-btn" onclick="switchTab('history-tab')">History</button>
+        <button class="nav-btn" onclick="switchTab('settings-tab')">⚙️ Settings</button>
       </div>
-      <button class="theme-toggle-btn" id="theme-btn" onclick="toggleTheme()">🌙 Dark</button>
+      <button class="theme-toggle-btn" id="theme-btn" onclick="quickToggleTheme()">🌙 Dark</button>
     </div>
   </nav>
 
@@ -29,11 +30,11 @@
       <h2>Terminal Checkout</h2>
       <div class="dashboard-grid">
         
-        <div class="card">
+        <div class="card glass-card">
           <h3>1. Load Account</h3>
           <div class="input-group">
-            <input type="text" id="lookup-acc-num" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Account Number..." />
-            <button class="btn btn-primary" onclick="lookupAccount()">Load</button>
+            <input type="text" id="lookup-acc-num" inputmode="numeric" placeholder="Enter Account Number..." />
+            <button class="btn btn-primary btn-animated" onclick="lookupAccount()">Load</button>
           </div>
           
           <div id="active-account-card" class="account-details hidden">
@@ -51,13 +52,13 @@
             
             <div class="balance-actions">
               <input type="number" id="balance-amount" inputmode="decimal" placeholder="Amount" step="0.01" />
-              <button class="btn btn-success" onclick="modifyBalance('add')">+ Add</button>
-              <button class="btn btn-warning" onclick="modifyBalance('remove')">- Remove</button>
+              <button class="btn btn-success btn-animated" onclick="modifyBalance('add')">+ Add</button>
+              <button class="btn btn-warning btn-animated" onclick="modifyBalance('remove')">- Remove</button>
             </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card glass-card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>2. Select Products</h3>
           </div>
@@ -66,17 +67,17 @@
 
           <div class="instant-scanner-box">
             <div class="instant-scanner-header">
-              <span>📷 Always-On Live Barcode Scanner</span>
-              <button class="btn btn-warning" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleInstantScanner()">Toggle Scanner</button>
+              <span>⚡ High-Speed Instant Scanner</span>
+              <button class="btn btn-warning btn-animated" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="toggleInstantScanner()">Toggle Stream</button>
             </div>
             <div id="instant-reader" class="instant-reader-feed"></div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card glass-card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>3. Current Cart</h3>
-            <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="clearCart()">Clear Cart</button>
+            <button class="btn btn-danger btn-animated" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="clearCart()">Clear Cart</button>
           </div>
           <ul id="cart-list" class="cart-list"></ul>
           
@@ -101,7 +102,7 @@
             <span>Total:</span>
             <strong id="cart-total-price">$0.00</strong>
           </div>
-          <button class="btn btn-accent btn-block" onclick="processCheckout()">Complete Purchase</button>
+          <button class="btn btn-accent btn-animated btn-block" onclick="processCheckout()">Complete Purchase</button>
         </div>
 
       </div>
@@ -110,23 +111,23 @@
     <section id="customers-tab" class="tab-content">
       <h2>Customer Management</h2>
       <div class="split-layout">
-        <div class="card">
+        <div class="card glass-card">
           <h3 id="cust-form-title">Create New Account</h3>
           <form id="create-account-form" onsubmit="handleAccountFormSubmit(event)">
             <input type="hidden" id="editing-acc-original" value="" />
-            <input type="text" id="cust-acc-num" inputmode="numeric" pattern="[0-9]*" placeholder="Account Number" required />
+            <input type="text" id="cust-acc-num" inputmode="numeric" placeholder="Account Number" required />
             <input type="text" id="cust-name" placeholder="Full Name" required />
-            <input type="tel" id="cust-phone" inputmode="numeric" pattern="[0-9]*" placeholder="Phone Number" required />
+            <input type="tel" id="cust-phone" inputmode="numeric" placeholder="Phone Number" required />
             <input type="email" id="cust-email" placeholder="Email Address (Optional)" />
             <input type="text" id="cust-address" placeholder="Address" required />
             <input type="number" id="cust-balance" inputmode="decimal" placeholder="Initial Deposit ($)" step="0.01" min="0" value="0" />
             
-            <button type="submit" id="cust-submit-btn" class="btn btn-primary btn-block">Create Account</button>
-            <button type="button" id="cust-cancel-btn" class="btn btn-warning btn-block hidden" style="margin-top: 0.5rem;" onclick="resetCustomerForm()">Cancel Edit</button>
+            <button type="submit" id="cust-submit-btn" class="btn btn-primary btn-animated btn-block">Create Account</button>
+            <button type="button" id="cust-cancel-btn" class="btn btn-warning btn-animated btn-block hidden" style="margin-top: 0.5rem;" onclick="resetCustomerForm()">Cancel Edit</button>
           </form>
         </div>
 
-        <div class="card">
+        <div class="card glass-card">
           <h3>All Accounts</h3>
           <div class="table-wrapper">
             <table>
@@ -149,35 +150,35 @@
     <section id="inventory-tab" class="tab-content">
       <h2>Inventory Management</h2>
       <div class="split-layout">
-        <div class="card">
+        <div class="card glass-card">
           <h3 id="prod-form-title">Add Product</h3>
           <form id="add-product-form" onsubmit="handleProductFormSubmit(event)">
             <input type="hidden" id="editing-prod-original" value="" />
             <input type="hidden" id="prod-image-data" value="" />
             
             <div class="input-group">
-              <input type="text" id="prod-code" inputmode="numeric" pattern="[0-9]*" placeholder="Barcode / Code" required />
-              <button type="button" class="btn btn-primary" style="white-space: nowrap;" onclick="openScanner('product')">📷 Scan</button>
-              <button type="button" class="btn btn-primary" style="white-space: nowrap;" onclick="generateRandomBarcode()">🎲 Auto</button>
+              <input type="text" id="prod-code" inputmode="numeric" placeholder="Barcode / Code" required />
+              <button type="button" class="btn btn-primary btn-animated" style="white-space: nowrap;" onclick="openScanner('product')">📷 Scan</button>
+              <button type="button" class="btn btn-primary btn-animated" style="white-space: nowrap;" onclick="generateRandomBarcode()">🎲 Auto</button>
             </div>
 
             <input type="text" id="prod-name" placeholder="Product Name" required />
             <input type="number" id="prod-price" inputmode="decimal" placeholder="Price ($)" step="0.01" min="0" required />
             <input type="number" id="prod-stock" inputmode="numeric" placeholder="Stock Quantity" min="0" required />
             
-            <button type="button" class="btn btn-accent btn-block" onclick="openPhotoCaptureModal()">📷 Snap Product Photo (Auto No-BG)</button>
+            <button type="button" class="btn btn-accent btn-animated btn-block" onclick="openPhotoCaptureModal()">📷 Snap Photo (Auto No-BG)</button>
 
             <div id="product-photo-preview-container" class="preview-container hidden">
               <p style="font-size: 0.8rem; color: var(--text-muted);">Transparent Cutout Preview:</p>
               <img id="product-photo-preview" src="" alt="Product Cutout" class="transparent-bg-preview" />
             </div>
             
-            <button type="submit" id="prod-submit-btn" class="btn btn-primary btn-block">Save Product</button>
-            <button type="button" id="prod-cancel-btn" class="btn btn-warning btn-block hidden" style="margin-top: 0.5rem;" onclick="resetProductForm()">Cancel Edit</button>
+            <button type="submit" id="prod-submit-btn" class="btn btn-primary btn-animated btn-block">Save Product</button>
+            <button type="button" id="prod-cancel-btn" class="btn btn-warning btn-animated btn-block hidden" style="margin-top: 0.5rem;" onclick="resetProductForm()">Cancel Edit</button>
           </form>
         </div>
 
-        <div class="card">
+        <div class="card glass-card">
           <h3>Product Catalog</h3>
           <div id="inventory-grid" class="product-grid"></div>
         </div>
@@ -186,7 +187,7 @@
 
     <section id="history-tab" class="tab-content">
       <h2>Transaction History</h2>
-      <div class="card">
+      <div class="card glass-card">
         <div class="table-wrapper">
           <table>
             <thead>
@@ -207,6 +208,55 @@
       </div>
     </section>
 
+    <section id="settings-tab" class="tab-content">
+      <h2>System & Interface Settings</h2>
+      <div class="split-layout">
+        <div class="card glass-card">
+          <h3>🎨 Custom UI Theme Settings</h3>
+          <div class="settings-group">
+            <label>Select Color Preset:</label>
+            <div class="theme-picker-grid">
+              <button class="theme-chip theme-dark" onclick="applyTheme('dark')">Dark Cyber</button>
+              <button class="theme-chip theme-light" onclick="applyTheme('light')">Clean Light</button>
+              <button class="theme-chip theme-neon" onclick="applyTheme('neon')">Neon Purple</button>
+              <button class="theme-chip theme-emerald" onclick="applyTheme('emerald')">Emerald Pro</button>
+              <button class="theme-chip theme-ocean" onclick="applyTheme('ocean')">Deep Ocean</button>
+            </div>
+          </div>
+
+          <div class="settings-group" style="margin-top: 1.5rem;">
+            <label for="setting-sound">Audio Feedback Tone:</label>
+            <select id="setting-sound" onchange="saveSettings()">
+              <option value="enabled">Enabled (Beep on Scan)</option>
+              <option value="disabled">Muted / Disabled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card glass-card">
+          <h3>⚡ Ultra-Fast Scanner Settings</h3>
+          <div class="settings-group">
+            <label for="setting-scan-cooldown">Scan Delay Cooldown (ms):</label>
+            <select id="setting-scan-cooldown" onchange="saveSettings()">
+              <option value="300">300ms (Instant Burst)</option>
+              <option value="600" selected>600ms (Recommended)</option>
+              <option value="1200">1200ms (Relaxed)</option>
+            </select>
+            <small style="color: var(--text-muted);">Lower delay allows instant continuous barcode processing.</small>
+          </div>
+
+          <div class="settings-group" style="margin-top: 1.5rem;">
+            <label for="setting-fps">Camera Frame Rate Target:</label>
+            <select id="setting-fps" onchange="saveSettings()">
+              <option value="60">60 FPS (Ultra High Speed)</option>
+              <option value="30" selected>30 FPS (Standard Balanced)</option>
+              <option value="15">15 FPS (Low End Hardware)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div id="photo-modal" class="modal-overlay hidden">
@@ -221,8 +271,8 @@
       </div>
 
       <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-        <button class="btn btn-success btn-block" onclick="captureAndRemoveBackground()">📸 Snap & Remove BG</button>
-        <button class="btn btn-danger btn-block" onclick="closePhotoModal()">Cancel</button>
+        <button class="btn btn-success btn-animated btn-block" onclick="captureAndRemoveBackground()">📸 Snap & Remove BG</button>
+        <button class="btn btn-danger btn-animated btn-block" onclick="closePhotoModal()">Cancel</button>
       </div>
     </div>
   </div>
@@ -239,7 +289,7 @@
       </div>
 
       <div id="reader" style="width: 100%; max-width: 400px; min-height: 200px; margin: 1rem auto;"></div>
-      <button class="btn btn-danger btn-block" onclick="closeScanner()">Close Camera</button>
+      <button class="btn btn-danger btn-animated btn-block" onclick="closeScanner()">Close Camera</button>
     </div>
   </div>
 
@@ -248,8 +298,8 @@
       <div id="print-label-header" class="print-label-number"></div>
       <svg id="barcode-canvas" style="margin: 0.5rem 0;"></svg>
       <div style="display: flex; gap: 0.5rem;" class="no-print">
-        <button class="btn btn-success btn-block" onclick="window.print()">🖨️ Print Barcode</button>
-        <button class="btn btn-danger btn-block" onclick="closeBarcodeModal()">Close</button>
+        <button class="btn btn-success btn-animated btn-block" onclick="window.print()">🖨️ Print Barcode</button>
+        <button class="btn btn-danger btn-animated btn-block" onclick="closeBarcodeModal()">Close</button>
       </div>
     </div>
   </div>
