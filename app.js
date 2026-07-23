@@ -13,6 +13,7 @@ let activeAccount = null;
 let cart = [];
 let html5QrcodeScanner = null;
 let currentCameraId = null;
+let currentScanTarget = 'cart'; // 'cart' or 'product'
 
 // Audio Feedback
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -128,7 +129,7 @@ function switchTab(tabId) {
 }
 
 // ----------------------------------------------------
-// BARCODE GENERATION, PRINTING & CAMERA SCANNING
+// BARCODE GENERATION, PRINTING & OPTIMIZED CAMERA SCANNING
 // ----------------------------------------------------
 
 function generateRandomBarcode() {
@@ -136,11 +137,24 @@ function generateRandomBarcode() {
   document.getElementById('prod-code').value = code;
 }
 
+// High-performance scanning from an uploaded picture
 function scanBarcodeImage(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const html5QrCode = new Html5Qrcode("reader");
+  const html5QrCode = new Html5Qrcode("reader", {
+    useBarCodeDetectorIfSupported: true,
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ]
+  });
+
   html5QrCode.scanFile(file, true)
     .then(decodedText => {
       document.getElementById('prod-code').value = decodedText;
@@ -151,15 +165,19 @@ function scanBarcodeImage(event) {
     });
 }
 
+// Display numbers ONLY on top and barcode below for printing
 function showBarcodeModal(code, name) {
-  document.getElementById('barcode-modal-title').innerText = `${name} (#${code})`;
+  const labelHeader = document.getElementById('print-label-header');
+  if (labelHeader) {
+    labelHeader.innerText = code; // Only the numbers on top
+  }
   
   JsBarcode("#barcode-canvas", code, {
     format: "CODE128",
     lineColor: "#000",
-    width: 2,
-    height: 80,
-    displayValue: true
+    width: 2.5,
+    height: 90,
+    displayValue: false // Numbers displayed on top via labelHeader
   });
 
   document.getElementById('barcode-modal').classList.remove('hidden');
@@ -169,13 +187,14 @@ function closeBarcodeModal() {
   document.getElementById('barcode-modal').classList.add('hidden');
 }
 
-// Open Camera Scanner & Detect Available Webcams / External Cameras
-async function openScanner() {
+// Open Camera Scanner (Target can be 'cart' or 'product')
+async function openScanner(target = 'cart') {
+  currentScanTarget = target;
   const modal = document.getElementById('scanner-modal');
   modal.classList.remove('hidden');
 
   if (window.location.protocol === 'file:') {
-    showNotification("Camera access requires hosting via web server (e.g., Live Server), not file://", "error");
+    showNotification("Camera access requires web server context (e.g. Live Server)", "error");
   }
 
   const cameraSelect = document.getElementById('camera-select');
@@ -192,8 +211,9 @@ async function openScanner() {
         cameraSelect.appendChild(option);
       });
 
-      // Default to the first detected camera or back camera
-      currentCameraId = devices[0].id;
+      // Prefer back camera or first available camera
+      currentCameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
+      cameraSelect.value = currentCameraId;
       startCameraStream(currentCameraId);
     } else {
       cameraSelect.innerHTML = '<option value="">No cameras found</option>';
@@ -206,15 +226,33 @@ async function openScanner() {
   }
 }
 
-// Start Stream for Selected Camera ID
+// Start Stream with High Frame Rate & Native Hardware Acceleration
 function startCameraStream(cameraId) {
   stopActiveCamera().then(() => {
-    html5QrcodeScanner = new Html5Qrcode("reader");
+    html5QrcodeScanner = new Html5Qrcode("reader", {
+      useBarCodeDetectorIfSupported: true,
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
+    });
+
+    const config = {
+      fps: 25, // Higher FPS for ultra-fast scanning
+      qrbox: { width: 280, height: 160 },
+      aspectRatio: 1.777778
+    };
+
     html5QrcodeScanner.start(
       cameraId,
-      { fps: 15, qrbox: { width: 250, height: 150 } },
+      config,
       (decodedText) => {
-        addToCartByBarcode(decodedText);
+        handleScannedCode(decodedText);
         closeScanner();
       },
       () => {}
@@ -232,7 +270,15 @@ function switchCamera(newCameraId) {
   }
 }
 
-// Helper to Stop Camera Stream safely
+function handleScannedCode(barcode) {
+  if (currentScanTarget === 'product') {
+    document.getElementById('prod-code').value = barcode;
+    showNotification(`Scanned Barcode: ${barcode}`, "success");
+  } else {
+    addToCartByBarcode(barcode);
+  }
+}
+
 function stopActiveCamera() {
   return new Promise((resolve) => {
     if (html5QrcodeScanner) {
@@ -250,7 +296,6 @@ function stopActiveCamera() {
   });
 }
 
-// Always Close Modal Safely
 function closeScanner() {
   const modal = document.getElementById('scanner-modal');
   stopActiveCamera().finally(() => {

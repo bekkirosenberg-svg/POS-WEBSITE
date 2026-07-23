@@ -331,15 +331,41 @@ th { color: var(--text-muted); }
   width: 90%; max-width: 500px;
 }
 
+.print-label-number {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+/* PRINT ONLY STYLES (Only Number + Barcode) */
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area {
-    position: absolute;
-    left: 50%; top: 20%;
-    transform: translateX(-50%);
-    background: white !important;
-    color: black !important;
+  body * {
+    visibility: hidden !important;
   }
-  .no-print { display: none !important; }
+  .print-area, .print-area * {
+    visibility: visible !important;
+  }
+  .print-area {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 10px !important;
+    text-align: center !important;
+  }
+  .print-label-number {
+    color: #000000 !important;
+    font-size: 1.8rem !important;
+    font-weight: 900 !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

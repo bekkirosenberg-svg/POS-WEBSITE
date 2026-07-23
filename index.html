@@ -60,7 +60,7 @@
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>2. Select Products</h3>
-            <button class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" onclick="openScanner()">📷 Scan Barcode</button>
+            <button class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" onclick="openScanner('cart')">📷 Scan Barcode</button>
           </div>
           <input type="text" id="pos-search" placeholder="Search by name or barcode..." oninput="renderStoreProducts()" />
           <div id="pos-product-grid" class="product-grid"></div>
@@ -149,11 +149,12 @@
             
             <div class="input-group">
               <input type="text" id="prod-code" inputmode="numeric" pattern="[0-9]*" placeholder="Barcode / Code" required />
+              <button type="button" class="btn btn-primary" style="white-space: nowrap;" onclick="openScanner('product')">📷 Scan</button>
               <button type="button" class="btn btn-primary" style="white-space: nowrap;" onclick="generateRandomBarcode()">🎲 Auto</button>
             </div>
 
             <label class="file-label" style="margin-top: 0.25rem;">
-              📷 Scan Barcode Image / File
+              📷 Upload Barcode Image / File
               <input type="file" accept="image/*" onchange="scanBarcodeImage(event)" />
             </label>
 
@@ -221,8 +222,8 @@
 
   <div id="barcode-modal" class="modal-overlay hidden">
     <div class="modal-card print-area" style="text-align: center;">
-      <h3 id="barcode-modal-title">Product Barcode</h3>
-      <svg id="barcode-canvas" style="margin: 1rem 0;"></svg>
+      <div id="print-label-header" class="print-label-number"></div>
+      <svg id="barcode-canvas" style="margin: 0.5rem 0;"></svg>
       <div style="display: flex; gap: 0.5rem;" class="no-print">
         <button class="btn btn-success btn-block" onclick="window.print()">🖨️ Print Barcode</button>
         <button class="btn btn-danger btn-block" onclick="closeBarcodeModal()">Close</button>
