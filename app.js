@@ -12,8 +12,12 @@ let history = JSON.parse(localStorage.getItem(DB_HISTORY)) || [];
 let activeAccount = null;
 let cart = [];
 let html5QrcodeScanner = null;
+let instantScannerInstance = null;
 let currentCameraId = null;
 let currentScanTarget = 'cart'; // 'cart' or 'product'
+let photoStream = null;
+let lastScannedCode = '';
+let scanCooldownTimer = null;
 
 // Audio Feedback
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -70,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderInventoryGrid();
   renderStoreProducts();
   renderHistoryTable();
+  initInstantScanner(); // Start instant scanner on load
 });
 
 // UI Theme
@@ -129,6 +134,157 @@ function switchTab(tabId) {
 }
 
 // ----------------------------------------------------
+// ALWAYS-ON INSTANT BARCODE SCANNER
+// ----------------------------------------------------
+
+async function initInstantScanner() {
+  const readerContainer = document.getElementById('instant-reader');
+  if (!readerContainer) return;
+
+  try {
+    const devices = await Html5Qrcode.getCameras();
+    if (devices && devices.length > 0) {
+      const selectedCamId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
+      
+      instantScannerInstance = new Html5Qrcode("instant-reader", {
+        useBarCodeDetectorIfSupported: true,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      });
+
+      const config = { fps: 25, qrbox: { width: 220, height: 100 } };
+
+      instantScannerInstance.start(
+        selectedCamId,
+        config,
+        (decodedText) => {
+          if (decodedText === lastScannedCode) return; // Prevent duplicate rapid scans
+          lastScannedCode = decodedText;
+          
+          addToCartByBarcode(decodedText);
+
+          // Clear scan cooldown after 1.5 seconds
+          clearTimeout(scanCooldownTimer);
+          scanCooldownTimer = setTimeout(() => { lastScannedCode = ''; }, 1500);
+        },
+        () => {}
+      ).catch(e => console.warn("Instant Scanner Standby:", e));
+    }
+  } catch (err) {
+    console.warn("Instant scanner camera setup deferred:", err);
+  }
+}
+
+function toggleInstantScanner() {
+  if (instantScannerInstance && instantScannerInstance.isScanning) {
+    instantScannerInstance.stop().then(() => {
+      showNotification("Instant scanner paused", "info");
+    });
+  } else {
+    initInstantScanner();
+  }
+}
+
+// ----------------------------------------------------
+// PRODUCT CAMERA PHOTO CAPTURE & AUTOMATIC BACKGROUND REMOVAL
+// ----------------------------------------------------
+
+async function openPhotoCaptureModal() {
+  const modal = document.getElementById('photo-modal');
+  const video = document.getElementById('photo-video');
+  modal.classList.remove('hidden');
+
+  try {
+    photoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = photoStream;
+  } catch (err) {
+    console.error("Camera capture error:", err);
+    showNotification("Unable to access camera for photo capture.", "error");
+    closePhotoModal();
+  }
+}
+
+function closePhotoModal() {
+  const modal = document.getElementById('photo-modal');
+  modal.classList.add('hidden');
+
+  if (photoStream) {
+    photoStream.getTracks().forEach(track => track.stop());
+    photoStream = null;
+  }
+}
+
+function captureAndRemoveBackground() {
+  const video = document.getElementById('photo-video');
+  if (!video || !photoStream) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // AUTOMATIC BACKGROUND REMOVAL ALGORITHM (Chroma / Light Threshold Keying)
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imgData.data;
+
+  // Sample top corner pixel as reference background color
+  const bgR = data[0];
+  const bgG = data[1];
+  const bgB = data[2];
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // Remove near-white background or background color matched to top corner
+    const isWhiteBG = (r > 200 && g > 200 && b > 200);
+    const colorDist = Math.sqrt(Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2));
+
+    if (isWhiteBG || colorDist < 60) {
+      data[i + 3] = 0; // Set Alpha transparent
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  const cleanDataUrl = canvas.toDataURL('image/png');
+
+  // Set to form preview and hidden input
+  document.getElementById('prod-image-data').value = cleanDataUrl;
+  const previewImg = document.getElementById('product-photo-preview');
+  previewImg.src = cleanDataUrl;
+  document.getElementById('product-photo-preview-container').classList.remove('hidden');
+
+  closePhotoModal();
+  showNotification("Product picture captured & background cleared!", "success");
+}
+
+function handleManualImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('prod-image-data').value = e.target.result;
+    document.getElementById('product-photo-preview').src = e.target.result;
+    document.getElementById('product-photo-preview-container').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ----------------------------------------------------
 // BARCODE GENERATION, PRINTING & OPTIMIZED CAMERA SCANNING
 // ----------------------------------------------------
 
@@ -137,7 +293,6 @@ function generateRandomBarcode() {
   document.getElementById('prod-code').value = code;
 }
 
-// High-performance scanning from an uploaded picture
 function scanBarcodeImage(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -165,11 +320,10 @@ function scanBarcodeImage(event) {
     });
 }
 
-// Display numbers ONLY on top and barcode below for printing
 function showBarcodeModal(code, name) {
   const labelHeader = document.getElementById('print-label-header');
   if (labelHeader) {
-    labelHeader.innerText = code; // Only the numbers on top
+    labelHeader.innerText = code;
   }
   
   JsBarcode("#barcode-canvas", code, {
@@ -177,7 +331,7 @@ function showBarcodeModal(code, name) {
     lineColor: "#000",
     width: 2.5,
     height: 90,
-    displayValue: false // Numbers displayed on top via labelHeader
+    displayValue: false
   });
 
   document.getElementById('barcode-modal').classList.remove('hidden');
@@ -187,15 +341,10 @@ function closeBarcodeModal() {
   document.getElementById('barcode-modal').classList.add('hidden');
 }
 
-// Open Camera Scanner (Target can be 'cart' or 'product')
 async function openScanner(target = 'cart') {
   currentScanTarget = target;
   const modal = document.getElementById('scanner-modal');
   modal.classList.remove('hidden');
-
-  if (window.location.protocol === 'file:') {
-    showNotification("Camera access requires web server context (e.g. Live Server)", "error");
-  }
 
   const cameraSelect = document.getElementById('camera-select');
   cameraSelect.innerHTML = '<option value="">Searching for cameras...</option>';
@@ -211,7 +360,6 @@ async function openScanner(target = 'cart') {
         cameraSelect.appendChild(option);
       });
 
-      // Prefer back camera or first available camera
       currentCameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
       cameraSelect.value = currentCameraId;
       startCameraStream(currentCameraId);
@@ -226,7 +374,6 @@ async function openScanner(target = 'cart') {
   }
 }
 
-// Start Stream with High Frame Rate & Native Hardware Acceleration
 function startCameraStream(cameraId) {
   stopActiveCamera().then(() => {
     html5QrcodeScanner = new Html5Qrcode("reader", {
@@ -243,7 +390,7 @@ function startCameraStream(cameraId) {
     });
 
     const config = {
-      fps: 25, // Higher FPS for ultra-fast scanning
+      fps: 25,
       qrbox: { width: 280, height: 160 },
       aspectRatio: 1.777778
     };
@@ -478,7 +625,7 @@ function handleProductFormSubmit(e) {
   e.preventDefault();
   const originalCode = document.getElementById('editing-prod-original').value;
   const code = document.getElementById('prod-code').value.trim();
-  const fileInput = document.getElementById('prod-image');
+  const imgDataInput = document.getElementById('prod-image-data').value;
 
   if (!/^\d+$/.test(code)) {
     showNotification("Product code/barcode must contain numbers only!", "error");
@@ -492,36 +639,27 @@ function handleProductFormSubmit(e) {
 
   const existingProd = originalCode ? products.find(p => p.code === originalCode) : null;
 
-  const saveProductData = (imgData) => {
-    const updatedProd = {
-      code, name: document.getElementById('prod-name').value.trim(),
-      price: parseFloat(document.getElementById('prod-price').value),
-      stock: parseInt(document.getElementById('prod-stock').value),
-      image: imgData || (existingProd ? existingProd.image : 'https://via.placeholder.com/100?text=No+Image')
-    };
-
-    if (originalCode) {
-      const prodIndex = products.findIndex(p => p.code === originalCode);
-      if (prodIndex !== -1) products[prodIndex] = updatedProd;
-      showNotification("Product updated successfully!", "success");
-    } else {
-      products.push(updatedProd);
-      showNotification("Product added successfully!", "success");
-    }
-
-    saveData(DB_PRODUCTS, products);
-    renderInventoryGrid();
-    renderStoreProducts();
-    resetProductForm();
+  const updatedProd = {
+    code,
+    name: document.getElementById('prod-name').value.trim(),
+    price: parseFloat(document.getElementById('prod-price').value),
+    stock: parseInt(document.getElementById('prod-stock').value),
+    image: imgDataInput || (existingProd ? existingProd.image : 'https://via.placeholder.com/100?text=No+Image')
   };
 
-  if (fileInput.files && fileInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (event) => saveProductData(event.target.result);
-    reader.readAsDataURL(fileInput.files[0]);
+  if (originalCode) {
+    const prodIndex = products.findIndex(p => p.code === originalCode);
+    if (prodIndex !== -1) products[prodIndex] = updatedProd;
+    showNotification("Product updated successfully!", "success");
   } else {
-    saveProductData(null);
+    products.push(updatedProd);
+    showNotification("Product added successfully!", "success");
   }
+
+  saveData(DB_PRODUCTS, products);
+  renderInventoryGrid();
+  renderStoreProducts();
+  resetProductForm();
 }
 
 function startEditProduct(code) {
@@ -534,6 +672,12 @@ function startEditProduct(code) {
   document.getElementById('prod-name').value = prod.name;
   document.getElementById('prod-price').value = prod.price;
   document.getElementById('prod-stock').value = prod.stock;
+  document.getElementById('prod-image-data').value = prod.image;
+
+  if (prod.image) {
+    document.getElementById('product-photo-preview').src = prod.image;
+    document.getElementById('product-photo-preview-container').classList.remove('hidden');
+  }
 
   document.getElementById('prod-submit-btn').innerText = 'Update Product';
   document.getElementById('prod-cancel-btn').classList.remove('hidden');
@@ -542,6 +686,8 @@ function startEditProduct(code) {
 function resetProductForm() {
   document.getElementById('add-product-form').reset();
   document.getElementById('editing-prod-original').value = '';
+  document.getElementById('prod-image-data').value = '';
+  document.getElementById('product-photo-preview-container').classList.add('hidden');
   document.getElementById('prod-form-title').innerText = 'Add Product';
   document.getElementById('prod-submit-btn').innerText = 'Save Product';
   document.getElementById('prod-cancel-btn').classList.add('hidden');
@@ -555,7 +701,9 @@ function renderInventoryGrid() {
   products.forEach(p => {
     grid.innerHTML += `
       <div class="prod-card">
-        <img src="${p.image}" alt="${p.name}" />
+        <div class="prod-card-img-wrapper">
+          <img src="${p.image}" alt="${p.name}" />
+        </div>
         <strong>${p.name}</strong>
         <p>$${p.price.toFixed(2)} | Stock: ${p.stock}</p>
         <small>Code: ${p.code}</small>
@@ -595,7 +743,9 @@ function renderStoreProducts() {
     .forEach(p => {
       grid.innerHTML += `
         <div class="prod-card" onclick="addToCart('${p.code}')">
-          <img src="${p.image}" alt="${p.name}" />
+          <div class="prod-card-img-wrapper">
+            <img src="${p.image}" alt="${p.name}" />
+          </div>
           <strong>${p.name}</strong>
           <p>$${p.price.toFixed(2)}</p>
           <small>Stock: ${p.stock}</small>

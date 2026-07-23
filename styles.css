@@ -209,12 +209,13 @@ input:focus { border-color: var(--accent); }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 1rem;
-  max-height: 500px;
+  max-height: 380px;
   overflow-y: auto;
 }
 
+/* TRANSPARENT CHECKERBOARD PATTERN FOR PRODUCT CUTOUTS */
 .prod-card {
-  background: var(--bg-color);
+  background-color: var(--bg-color);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem;
@@ -225,12 +226,49 @@ input:focus { border-color: var(--accent); }
 
 .prod-card:hover { transform: translateY(-3px); border-color: var(--accent); }
 
-.prod-card img {
-  width: 100%;
-  height: 80px;
-  object-fit: cover;
+.prod-card-img-wrapper {
+  background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
   border-radius: 6px;
+  overflow: hidden;
   margin-bottom: 0.5rem;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prod-card img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* ALWAYS-ON INSTANT BARCODE SCANNER DOCK */
+.instant-scanner-box {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  margin-top: auto;
+}
+
+.instant-scanner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.instant-reader-feed {
+  width: 100%;
+  height: 140px;
+  background: var(--bg-color);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px dashed var(--accent);
 }
 
 .cart-list { list-style: none; max-height: 250px; overflow-y: auto; }
@@ -312,6 +350,24 @@ th { color: var(--text-muted); }
 }
 
 .file-label input { display: none; }
+
+.preview-container {
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--bg-color);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.transparent-bg-preview {
+  max-width: 100px;
+  max-height: 100px;
+  object-fit: contain;
+  background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+  background-size: 12px 12px;
+  border-radius: 6px;
+  margin-top: 0.25rem;
+}
 
 /* MODALS & PRINT CONTROLS */
 .modal-overlay {
