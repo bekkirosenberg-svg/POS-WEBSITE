@@ -11,8 +11,8 @@ let products = JSON.parse(localStorage.getItem(DB_PRODUCTS)) || [];
 let history = JSON.parse(localStorage.getItem(DB_HISTORY)) || [];
 let settings = JSON.parse(localStorage.getItem(DB_SETTINGS)) || {
   sound: 'enabled',
-  cooldown: 600,
-  fps: 30
+  cooldown: 400,
+  fps: 60
 };
 
 let activeAccount = null;
@@ -127,7 +127,6 @@ function saveSettings() {
   localStorage.setItem(DB_SETTINGS, JSON.stringify(settings));
   showNotification("Settings updated!", "success");
 
-  // Restart live scanner with high speed settings applied
   if (instantScannerInstance && instantScannerInstance.isScanning) {
     instantScannerInstance.stop().then(() => initInstantScanner());
   }
@@ -199,10 +198,9 @@ async function initInstantScanner() {
         ]
       });
 
-      // High Performance FPS Target Constraints
       const config = {
-        fps: settings.fps || 30,
-        qrbox: { width: 280, height: 120 },
+        fps: settings.fps || 60,
+        qrbox: { width: 280, height: 140 },
         videoConstraints: {
           facingMode: "environment",
           width: { min: 640, ideal: 1280, max: 1920 },
@@ -222,7 +220,7 @@ async function initInstantScanner() {
           clearTimeout(scanCooldownTimer);
           scanCooldownTimer = setTimeout(() => {
             lastScannedCode = '';
-          }, settings.cooldown || 600);
+          }, settings.cooldown || 400);
         },
         () => {}
       ).catch(e => console.warn("Live scanner starting standby:", e));
@@ -392,7 +390,7 @@ function startCameraStream(cameraId) {
       ]
     });
 
-    const config = { fps: 30, qrbox: { width: 280, height: 160 } };
+    const config = { fps: 60, qrbox: { width: 280, height: 160 } };
 
     html5QrcodeScanner.start(
       cameraId,

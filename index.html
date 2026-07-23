@@ -67,10 +67,13 @@
 
           <div class="instant-scanner-box">
             <div class="instant-scanner-header">
-              <span>⚡ High-Speed Instant Scanner</span>
+              <span>⚡ High-Speed Laser Scanner</span>
               <button class="btn btn-warning btn-animated" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="toggleInstantScanner()">Toggle Stream</button>
             </div>
-            <div id="instant-reader" class="instant-reader-feed"></div>
+            <div class="scanner-wrapper">
+              <div id="instant-reader" class="instant-reader-feed"></div>
+              <div class="laser-line"></div>
+            </div>
           </div>
         </div>
 
@@ -238,19 +241,18 @@
           <div class="settings-group">
             <label for="setting-scan-cooldown">Scan Delay Cooldown (ms):</label>
             <select id="setting-scan-cooldown" onchange="saveSettings()">
-              <option value="300">300ms (Instant Burst)</option>
-              <option value="600" selected>600ms (Recommended)</option>
-              <option value="1200">1200ms (Relaxed)</option>
+              <option value="200">200ms (Ultra Instant)</option>
+              <option value="400" selected>400ms (High Speed)</option>
+              <option value="800">800ms (Standard)</option>
             </select>
-            <small style="color: var(--text-muted);">Lower delay allows instant continuous barcode processing.</small>
+            <small style="color: var(--text-muted);">Lower delay captures barcodes rapidly line by line.</small>
           </div>
 
           <div class="settings-group" style="margin-top: 1.5rem;">
             <label for="setting-fps">Camera Frame Rate Target:</label>
             <select id="setting-fps" onchange="saveSettings()">
-              <option value="60">60 FPS (Ultra High Speed)</option>
-              <option value="30" selected>30 FPS (Standard Balanced)</option>
-              <option value="15">15 FPS (Low End Hardware)</option>
+              <option value="60" selected>60 FPS (Ultra High Speed)</option>
+              <option value="30">30 FPS (Standard Balanced)</option>
             </select>
           </div>
         </div>
