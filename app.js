@@ -14,12 +14,12 @@ let cart = [];
 let html5QrcodeScanner = null;
 let instantScannerInstance = null;
 let currentCameraId = null;
-let currentScanTarget = 'cart'; // 'cart' or 'product'
+let currentScanTarget = 'cart';
 let photoStream = null;
 let lastScannedCode = '';
 let scanCooldownTimer = null;
 
-// Audio Feedback
+// Audio Feedback System
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
@@ -62,7 +62,7 @@ function playSound(type) {
       osc.stop(now + 0.2);
     }
   } catch (e) {
-    console.warn('Audio blocked:', e);
+    console.warn('Audio output blocked:', e);
   }
 }
 
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderInventoryGrid();
   renderStoreProducts();
   renderHistoryTable();
-  initInstantScanner(); // Start instant scanner on load
+  initInstantScanner();
 });
 
 // UI Theme
@@ -134,7 +134,7 @@ function switchTab(tabId) {
 }
 
 // ----------------------------------------------------
-// ALWAYS-ON INSTANT BARCODE SCANNER
+// ALWAYS-ON LIVE SCANNER DOCK
 // ----------------------------------------------------
 
 async function initInstantScanner() {
@@ -159,33 +159,32 @@ async function initInstantScanner() {
         ]
       });
 
-      const config = { fps: 25, qrbox: { width: 220, height: 100 } };
+      const config = { fps: 20, qrbox: { width: 220, height: 100 } };
 
       instantScannerInstance.start(
         selectedCamId,
         config,
         (decodedText) => {
-          if (decodedText === lastScannedCode) return; // Prevent duplicate rapid scans
+          if (decodedText === lastScannedCode) return;
           lastScannedCode = decodedText;
           
           addToCartByBarcode(decodedText);
 
-          // Clear scan cooldown after 1.5 seconds
           clearTimeout(scanCooldownTimer);
           scanCooldownTimer = setTimeout(() => { lastScannedCode = ''; }, 1500);
         },
         () => {}
-      ).catch(e => console.warn("Instant Scanner Standby:", e));
+      ).catch(e => console.warn("Live scanner starting standby:", e));
     }
   } catch (err) {
-    console.warn("Instant scanner camera setup deferred:", err);
+    console.warn("Live scanner waiting for camera permissions:", err);
   }
 }
 
 function toggleInstantScanner() {
   if (instantScannerInstance && instantScannerInstance.isScanning) {
     instantScannerInstance.stop().then(() => {
-      showNotification("Instant scanner paused", "info");
+      showNotification("Live scanner paused", "info");
     });
   } else {
     initInstantScanner();
@@ -193,7 +192,7 @@ function toggleInstantScanner() {
 }
 
 // ----------------------------------------------------
-// PRODUCT CAMERA PHOTO CAPTURE & AUTOMATIC BACKGROUND REMOVAL
+// LIVE PRODUCT SNAPSHOT WITH AUTOMATIC BACKGROUND REMOVAL
 // ----------------------------------------------------
 
 async function openPhotoCaptureModal() {
@@ -207,8 +206,8 @@ async function openPhotoCaptureModal() {
     });
     video.srcObject = photoStream;
   } catch (err) {
-    console.error("Camera capture error:", err);
-    showNotification("Unable to access camera for photo capture.", "error");
+    console.error("Camera snapshot open error:", err);
+    showNotification("Could not start camera for product picture.", "error");
     closePhotoModal();
   }
 }
@@ -234,11 +233,11 @@ function captureAndRemoveBackground() {
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // AUTOMATIC BACKGROUND REMOVAL ALGORITHM (Chroma / Light Threshold Keying)
+  // AUTOMATIC BACKGROUND CUTOUT FILTER
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
 
-  // Sample top corner pixel as reference background color
+  // Use top-left pixel sampling for ambient background color
   const bgR = data[0];
   const bgG = data[1];
   const bgB = data[2];
@@ -248,76 +247,34 @@ function captureAndRemoveBackground() {
     const g = data[i + 1];
     const b = data[i + 2];
 
-    // Remove near-white background or background color matched to top corner
-    const isWhiteBG = (r > 200 && g > 200 && b > 200);
+    const isLightBackground = (r > 190 && g > 190 && b > 190);
     const colorDist = Math.sqrt(Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2));
 
-    if (isWhiteBG || colorDist < 60) {
-      data[i + 3] = 0; // Set Alpha transparent
+    if (isLightBackground || colorDist < 65) {
+      data[i + 3] = 0; // Set pixel fully transparent
     }
   }
 
   ctx.putImageData(imgData, 0, 0);
 
-  const cleanDataUrl = canvas.toDataURL('image/png');
+  const transparentPNG = canvas.toDataURL('image/png');
 
-  // Set to form preview and hidden input
-  document.getElementById('prod-image-data').value = cleanDataUrl;
+  document.getElementById('prod-image-data').value = transparentPNG;
   const previewImg = document.getElementById('product-photo-preview');
-  previewImg.src = cleanDataUrl;
+  previewImg.src = transparentPNG;
   document.getElementById('product-photo-preview-container').classList.remove('hidden');
 
   closePhotoModal();
-  showNotification("Product picture captured & background cleared!", "success");
-}
-
-function handleManualImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    document.getElementById('prod-image-data').value = e.target.result;
-    document.getElementById('product-photo-preview').src = e.target.result;
-    document.getElementById('product-photo-preview-container').classList.remove('hidden');
-  };
-  reader.readAsDataURL(file);
+  showNotification("Product picture saved with background removed!", "success");
 }
 
 // ----------------------------------------------------
-// BARCODE GENERATION, PRINTING & OPTIMIZED CAMERA SCANNING
+// BARCODES & OVERLAY SCANNER
 // ----------------------------------------------------
 
 function generateRandomBarcode() {
   const code = Math.floor(100000000000 + Math.random() * 900000000000).toString();
   document.getElementById('prod-code').value = code;
-}
-
-function scanBarcodeImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const html5QrCode = new Html5Qrcode("reader", {
-    useBarCodeDetectorIfSupported: true,
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.QR_CODE
-    ]
-  });
-
-  html5QrCode.scanFile(file, true)
-    .then(decodedText => {
-      document.getElementById('prod-code').value = decodedText;
-      showNotification(`Extracted Barcode: ${decodedText}`, "success");
-    })
-    .catch(() => {
-      showNotification("Could not read barcode from image", "error");
-    });
 }
 
 function showBarcodeModal(code, name) {
@@ -365,11 +322,11 @@ async function openScanner(target = 'cart') {
       startCameraStream(currentCameraId);
     } else {
       cameraSelect.innerHTML = '<option value="">No cameras found</option>';
-      showNotification("No cameras detected on this device.", "error");
+      showNotification("No cameras detected.", "error");
     }
   } catch (err) {
-    console.error("Camera detection error:", err);
-    cameraSelect.innerHTML = '<option value="">Camera access denied</option>';
+    console.error("Camera scan error:", err);
+    cameraSelect.innerHTML = '<option value="">Camera error</option>';
     showNotification("Camera access denied or unavailable.", "error");
   }
 }
@@ -405,7 +362,7 @@ function startCameraStream(cameraId) {
       () => {}
     ).catch(err => {
       console.error("Failed to start stream:", err);
-      showNotification("Failed to open selected camera.", "error");
+      showNotification("Failed to open camera stream.", "error");
     });
   });
 }
@@ -454,9 +411,9 @@ function addToCartByBarcode(barcode) {
   const prod = products.find(p => p.code === barcode);
   if (prod) {
     addToCart(prod.code);
-    showNotification(`Scanned & Added: ${prod.name}`, "success");
+    showNotification(`Added: ${prod.name}`, "success");
   } else {
-    showNotification(`No product found with barcode #${barcode}`, "error");
+    showNotification(`No product matched barcode #${barcode}`, "error");
   }
 }
 
@@ -469,12 +426,12 @@ function handleAccountFormSubmit(e) {
   const emailInput = document.getElementById('cust-email').value.trim();
 
   if (!/^\d+$/.test(accNum) || !/^\d+$/.test(phone)) {
-    showNotification("Account and Phone numbers must be numeric!", "error");
+    showNotification("Account and Phone numbers must contain numbers only!", "error");
     return;
   }
 
   if ((!originalAccNum || originalAccNum !== accNum) && accounts.some(a => a.accNum === accNum)) {
-    showNotification("An account with this number already exists!", "error");
+    showNotification("Account number already exists!", "error");
     return;
   }
 
@@ -491,7 +448,7 @@ function handleAccountFormSubmit(e) {
         activeAccount = accounts[accIndex];
         updateAccountUI();
       }
-      showNotification("Account updated successfully!", "success");
+      showNotification("Account updated!", "success");
     }
   } else {
     accounts.push({
@@ -500,7 +457,7 @@ function handleAccountFormSubmit(e) {
       address: document.getElementById('cust-address').value.trim(),
       balance: parseFloat(document.getElementById('cust-balance').value) || 0
     });
-    showNotification("Account created successfully!", "success");
+    showNotification("Account created!", "success");
   }
 
   saveData(DB_ACCOUNTS, accounts);
@@ -607,7 +564,7 @@ function modifyBalance(action) {
     showNotification(`Added $${amount.toFixed(2)}`, "success");
   } else if (action === 'remove') {
     if (activeAccount.balance < amount) {
-      showNotification("Error: Insufficient balance!", "error");
+      showNotification("Insufficient account balance!", "error");
       return;
     }
     activeAccount.balance -= amount;
@@ -620,7 +577,7 @@ function modifyBalance(action) {
   amtInput.value = '';
 }
 
-// Product & Inventory
+// Product Management
 function handleProductFormSubmit(e) {
   e.preventDefault();
   const originalCode = document.getElementById('editing-prod-original').value;
@@ -628,7 +585,7 @@ function handleProductFormSubmit(e) {
   const imgDataInput = document.getElementById('prod-image-data').value;
 
   if (!/^\d+$/.test(code)) {
-    showNotification("Product code/barcode must contain numbers only!", "error");
+    showNotification("Barcode must contain numbers only!", "error");
     return;
   }
 
@@ -650,10 +607,10 @@ function handleProductFormSubmit(e) {
   if (originalCode) {
     const prodIndex = products.findIndex(p => p.code === originalCode);
     if (prodIndex !== -1) products[prodIndex] = updatedProd;
-    showNotification("Product updated successfully!", "success");
+    showNotification("Product updated!", "success");
   } else {
     products.push(updatedProd);
-    showNotification("Product added successfully!", "success");
+    showNotification("Product saved!", "success");
   }
 
   saveData(DB_PRODUCTS, products);
@@ -754,7 +711,7 @@ function renderStoreProducts() {
     });
 }
 
-// Cart & Checkout
+// Cart & Checkout Logic
 function addToCart(code) {
   const prod = products.find(p => p.code === code);
   if (!prod || prod.stock <= 0) {
@@ -765,7 +722,7 @@ function addToCart(code) {
   const cartItem = cart.find(item => item.code === code);
   if (cartItem) {
     if (cartItem.qty >= prod.stock) {
-      showNotification("Cannot add more than available stock!", "error");
+      showNotification("Cannot exceed available stock limit!", "error");
       return;
     }
     cartItem.qty++;
@@ -785,7 +742,7 @@ function updateCartQty(code, change) {
 
   if (change > 0) {
     if (prod && cartItem.qty >= prod.stock) {
-      showNotification("Cannot add more than available stock!", "error");
+      showNotification("Cannot exceed available stock limit!", "error");
       return;
     }
     cartItem.qty++;
@@ -857,7 +814,7 @@ function renderCart() {
 
 function processCheckout() {
   if (!activeAccount) {
-    showNotification("Please load a customer account first!", "error");
+    showNotification("Load a customer account before checking out!", "error");
     return;
   }
 
@@ -876,7 +833,7 @@ function processCheckout() {
   const totalCost = taxableAmount + taxAmount;
 
   if (activeAccount.balance < totalCost) {
-    showNotification("Customer doesn't have enough balance!", "error");
+    showNotification("Customer balance is too low!", "error");
     return;
   }
 
@@ -908,7 +865,7 @@ function processCheckout() {
   renderStoreProducts();
   renderHistoryTable();
 
-  showNotification("Purchase successful!", "success");
+  showNotification("Checkout complete!", "success");
 }
 
 function renderHistoryTable() {
@@ -938,11 +895,11 @@ function renderHistoryTable() {
 }
 
 function deleteHistoryEntry(index) {
-  if (confirm("Delete this transaction record from history?")) {
+  if (confirm("Delete this history record?")) {
     history.splice(index, 1);
     saveData(DB_HISTORY, history);
     renderHistoryTable();
-    showNotification("History entry deleted", "warning");
+    showNotification("Entry deleted", "warning");
   }
 }
 

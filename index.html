@@ -66,7 +66,7 @@
 
           <div class="instant-scanner-box">
             <div class="instant-scanner-header">
-              <span>📷 Live Barcode Scanner</span>
+              <span>📷 Always-On Live Barcode Scanner</span>
               <button class="btn btn-warning" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleInstantScanner()">Toggle Scanner</button>
             </div>
             <div id="instant-reader" class="instant-reader-feed"></div>
@@ -161,11 +161,6 @@
               <button type="button" class="btn btn-primary" style="white-space: nowrap;" onclick="generateRandomBarcode()">🎲 Auto</button>
             </div>
 
-            <label class="file-label" style="margin-top: 0.25rem;">
-              📷 Upload Barcode Image / File
-              <input type="file" accept="image/*" onchange="scanBarcodeImage(event)" />
-            </label>
-
             <input type="text" id="prod-name" placeholder="Product Name" required />
             <input type="number" id="prod-price" inputmode="decimal" placeholder="Price ($)" step="0.01" min="0" required />
             <input type="number" id="prod-stock" inputmode="numeric" placeholder="Stock Quantity" min="0" required />
@@ -173,14 +168,9 @@
             <button type="button" class="btn btn-accent btn-block" onclick="openPhotoCaptureModal()">📷 Snap Product Photo (Auto No-BG)</button>
 
             <div id="product-photo-preview-container" class="preview-container hidden">
-              <p style="font-size: 0.8rem; color: var(--text-muted);">Cutout Preview (Transparent BG):</p>
-              <img id="product-photo-preview" src="" alt="Product Preview" class="transparent-bg-preview" />
+              <p style="font-size: 0.8rem; color: var(--text-muted);">Transparent Cutout Preview:</p>
+              <img id="product-photo-preview" src="" alt="Product Cutout" class="transparent-bg-preview" />
             </div>
-
-            <label class="file-label">
-              Upload Custom Product Image
-              <input type="file" id="prod-image" accept="image/*" onchange="handleManualImageUpload(event)" />
-            </label>
             
             <button type="submit" id="prod-submit-btn" class="btn btn-primary btn-block">Save Product</button>
             <button type="button" id="prod-cancel-btn" class="btn btn-warning btn-block hidden" style="margin-top: 0.5rem;" onclick="resetProductForm()">Cancel Edit</button>
@@ -223,7 +213,7 @@
     <div class="modal-card">
       <h3>Take Product Picture</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-        Position the product in front of a clean background. Background will be removed automatically.
+        Hold the product in view. Background will be removed automatically on snap.
       </p>
       
       <div class="camera-stream-wrapper">
@@ -231,7 +221,7 @@
       </div>
 
       <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-        <button class="btn btn-success btn-block" onclick="captureAndRemoveBackground()">📸 Take Snap & Clean BG</button>
+        <button class="btn btn-success btn-block" onclick="captureAndRemoveBackground()">📸 Snap & Remove BG</button>
         <button class="btn btn-danger btn-block" onclick="closePhotoModal()">Cancel</button>
       </div>
     </div>
